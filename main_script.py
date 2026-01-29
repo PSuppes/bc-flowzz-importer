@@ -436,10 +436,16 @@ class BusinessCentralConnector:
 
 def get_driver():
     chrome_options = Options()
-    # chrome_options.add_argument("--headless=new") 
+    
+    # --- WICHTIGE CLOUD EINSTELLUNGEN ---
+    chrome_options.add_argument("--headless=new")       # Ohne Fenster (Pflicht für Cloud)
+    chrome_options.add_argument("--no-sandbox")         # Sicherheitssperre umgehen (Pflicht für Docker/Linux)
+    chrome_options.add_argument("--disable-dev-shm-usage") # Speicher-Fix für Container
+    chrome_options.add_argument("--disable-gpu")        # GPU deaktivieren (spart Ressourcen)
+    chrome_options.add_argument("--window-size=1920,1080") # Simuliert Full-HD Screen für Layouts
+    
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
-    driver.maximize_window()
     return driver
 
 def clean_text(text):
@@ -743,4 +749,5 @@ def run_nightly_scraper():
         print("😴 Scraper beendet.")
 
 if __name__ == "__main__":
+
     run_nightly_scraper()
