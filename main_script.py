@@ -20,11 +20,11 @@ from connector import BusinessCentralConnector, VALUE_MAPPINGS, clean_string_glo
 # CONFIG (Nur noch Scraper spezifisch)
 QUEUE_FILE = "import_queue.json"
 START_URL     = "https://flowzz.com/product?sort%5Bn%5D=createdAt&sort%5Bd%5D=-1&fav=0&pagination%5Bpage%5D=1&avail=1"
-ANZAHL_CHECK  = 4
+ANZAHL_CHECK  = 24
 MAX_ITEMS_PRO_SPALTE = 3 
 BILDER_ORDNER = "Produkt_Bilder"
 
-# --- HELPER FUNKTIONEN (Bleiben wie sie sind, nur kürzer) ---
+# --- HELPER FUNKTIONEN  ---
 
 def get_driver():
     chrome_options = Options()
@@ -321,3 +321,4 @@ def run_nightly_scraper():
 
 if __name__ == "__main__":
     run_nightly_scraper()
+
