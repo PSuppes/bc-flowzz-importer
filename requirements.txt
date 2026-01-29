@@ -1,0 +1,8 @@
+pandas
+requests
+selenium
+webdriver-manager
+Pillow
+azure-data-tables
+streamlit
+openpyxl
