@@ -4,6 +4,7 @@ import os
 import json
 import time
 from difflib import SequenceMatcher
+from PIL import Image, ImageDraw
 
 # KONFIGURATION
 TENANT_ID     = "675e2df2-6e8f-4868-a9d7-2d3d1d093907"
@@ -34,6 +35,22 @@ def clean_string_global(text):
     text = re.sub(r'[^\w\s,.\-\(\)%/:]', '', text) 
     text = re.sub(r'\s+', ' ', text).strip()
     return text
+
+# NEU: Die Putz-Funktion direkt im Connector
+def remove_watermark_rectangle(file_path):
+    try:
+        with Image.open(file_path) as img:
+            img = img.convert("RGB")
+            width, height = img.size
+            draw = ImageDraw.Draw(img)
+            # Koordinaten für das Rechteck unten rechts (Flowzz Logo)
+            rect_width = 380
+            rect_height = 160
+            coords = [width - rect_width, height - rect_height, width, height]
+            draw.rectangle(coords, fill=(255, 255, 255), outline=None)
+            img.save(file_path, quality=95)
+    except Exception as e:
+        print(f"      ⚠️ Warnung: Konnte Wasserzeichen nicht entfernen: {e}")
 
 # Mappings
 VALUE_MAPPINGS = {
@@ -339,15 +356,16 @@ class BusinessCentralConnector:
             self.existing_items_cache.append(item) 
             print(f"   ✅ Erstellt: {item['number']} - {item['displayName']}")
             
-            # Bild laden (Fallback URL wenn Datei nicht da)
+            # --- BILD LOGIK UPDATE (MIT CLEANING) ---
             final_img_path = bild_pfad
+            temp_path = "temp_upload.jpg"
+            
+            # Fallback auf URL, wenn lokal kein Bild da ist (typischer Cloud Fall)
             if (not final_img_path or not os.path.exists(final_img_path)) and 'Bild Datei URL' in scraped_data:
-                # Wir laden das Bild kurz temporär herunter, nur für den Upload
                 try:
                     img_url = scraped_data['Bild Datei URL']
                     if img_url:
-                        # Dummy download logik im Connector für den Notfall
-                        temp_path = "temp_upload.jpg"
+                        # Download
                         r_img = requests.get(img_url if img_url.startswith("http") else f"https://flowzz.com{img_url}", stream=True)
                         if r_img.status_code == 200:
                             with open(temp_path, 'wb') as f:
@@ -355,13 +373,18 @@ class BusinessCentralConnector:
                             final_img_path = temp_path
                 except: pass
 
-            if final_img_path and os.path.exists(final_img_path) and item_id:
-                time.sleep(1) 
-                self._upload_image(item_id, final_img_path)
-                # Cleanup Temp
-                if final_img_path == "temp_upload.jpg":
-                    try: os.remove(temp_path)
-                    except: pass
+            if final_img_path and os.path.exists(final_img_path):
+                # 🧼 HIER WIRD GEPUTZT!
+                remove_watermark_rectangle(final_img_path)
+
+                if item_id:
+                    time.sleep(1) 
+                    self._upload_image(item_id, final_img_path)
+            
+            # Cleanup
+            if final_img_path == temp_path and os.path.exists(temp_path):
+                try: os.remove(temp_path)
+                except: pass
             
             self._process_and_link_attributes(item['number'], scraped_data)
             return True
