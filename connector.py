@@ -3,6 +3,7 @@ import re
 import os
 import json
 import time
+from difflib import SequenceMatcher
 
 # KONFIGURATION
 TENANT_ID     = "675e2df2-6e8f-4868-a9d7-2d3d1d093907"
