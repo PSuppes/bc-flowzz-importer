@@ -1,0 +1,39 @@
+name: Nightly Flowzz Scraper
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Jeden Morgen um 03:00 Uhr UTC
+  workflow_dispatch: # Damit du es auch per Button starten kannst
+
+permissions:
+  contents: write # WICHTIG: Erlaubt dem Skript, die JSON zu speichern
+
+jobs:
+  scrape-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v3
+
+      - name: Python installieren
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Chrome installieren
+        uses: browser-actions/setup-chrome@latest
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: Scraper ausführen
+        run: python main_script.py
+        # Deine main_script.py muss so eingestellt sein, dass sie import_queue.json schreibt
+
+      - name: Ergebnisse speichern (Git Commit)
+        run: |
+          git config --global user.name 'FlowzzBot'
+          git config --global user.email 'bot@noreply.github.com'
+          git add import_queue.json
+          # Nur committen, wenn sich was geändert hat
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update Queue Data [skip ci]" && git push)
