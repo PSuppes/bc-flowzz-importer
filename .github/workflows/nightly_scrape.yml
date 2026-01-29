@@ -26,9 +26,14 @@ jobs:
       - name: Abhängigkeiten installieren
         run: pip install -r requirements.txt
 
+      # --- HIER WURDE GEÄNDERT ---
       - name: Scraper ausführen
+        # Wir laden die Geheimnisse aus GitHub und stellen sie als Umgebungsvariablen bereit
+        env:
+          BC_CLIENT_ID: ${{ secrets.BC_CLIENT_ID }}
+          BC_CLIENT_SECRET: ${{ secrets.BC_CLIENT_SECRET }}
         run: python main_script.py
-        # Deine main_script.py muss so eingestellt sein, dass sie import_queue.json schreibt
+      # ---------------------------
 
       - name: Ergebnisse speichern (Git Commit)
         run: |
