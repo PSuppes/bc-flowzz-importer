@@ -1,8 +1,7 @@
+streamlit
 pandas
 requests
+openpyxl
 selenium
 webdriver-manager
 Pillow
-azure-data-tables
-streamlit
-openpyxl
