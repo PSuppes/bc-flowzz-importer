@@ -6,7 +6,9 @@ import time
 from difflib import SequenceMatcher
 from PIL import Image, ImageDraw
 
+# ==========================================
 # KONFIGURATION
+# ==========================================
 TENANT_ID     = "675e2df2-6e8f-4868-a9d7-2d3d1d093907"
 ENVIRONMENT   = "Production" 
 # Lädt Secrets aus Umgebungsvariablen (für Cloud) oder nutzt leeren String
@@ -28,7 +30,10 @@ API_ENTITY    = "itemAttributeMappings"
 START_NUMMER  = 3000   
 PREFIX        = "100." 
 
-# Helper
+# ==========================================
+# HELPER & CLEANING
+# ==========================================
+
 def clean_string_global(text):
     if not text: return ""
     text = str(text)
@@ -36,7 +41,6 @@ def clean_string_global(text):
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-# NEU: Die Putz-Funktion direkt im Connector
 def remove_watermark_rectangle(file_path):
     try:
         with Image.open(file_path) as img:
@@ -52,7 +56,9 @@ def remove_watermark_rectangle(file_path):
     except Exception as e:
         print(f"      ⚠️ Warnung: Konnte Wasserzeichen nicht entfernen: {e}")
 
-# Mappings
+# ==========================================
+# MAPPINGS
+# ==========================================
 VALUE_MAPPINGS = {
     "Sorte": {
         "Hybrid Indica dominant": "Indica dominant", 
@@ -109,6 +115,9 @@ MANUFACTURER_CODE_MAPPING = {
 CREATE_NEW_VALUES = True 
 MAX_ITEMS_PRO_SPALTE = 3
 
+# ==========================================
+# CLASS: BusinessCentralConnector
+# ==========================================
 class BusinessCentralConnector:
     def __init__(self):
         self.base_url = f"https://api.businesscentral.dynamics.com/v2.0/{TENANT_ID}/{ENVIRONMENT}/api/v2.0"
@@ -208,7 +217,6 @@ class BusinessCentralConnector:
         clean_val = clean_string_global(raw_val)
         if not clean_val: return None
 
-        # Putz-Logik (Importiert Mappings automatisch)
         def normalize_for_match(s):
             return re.sub(r'[\W_]+', '', s.lower())
 
@@ -335,9 +343,28 @@ class BusinessCentralConnector:
                     m_code = v
                     break
 
+        # ==========================================================
+        # NEU: Logic für "Produktname - Kultivar"
+        # ==========================================================
+        p_name = scraped_data.get('Produktname', '').strip()
+        p_kultivar = scraped_data.get('Kultivar', '').strip()
+        
+        final_display_name = display_name 
+
+        if p_name and p_kultivar:
+            # Wenn der Kultivar schon hinten am Namen klebt, erst bereinigen
+            if p_name.endswith(p_kultivar):
+                # Aber nur wenn KEIN Bindestrich davor ist
+                if not p_name.endswith(f"- {p_kultivar}") and not p_name.endswith(f"-{p_kultivar}"):
+                     p_name = p_name[:-len(p_kultivar)].strip()
+            
+            # Jetzt sauber zusammenbauen
+            final_display_name = f"{p_name} - {p_kultivar}"
+
+        # Payload erstellen
         payload = {
             "number": next_no,
-            "displayName": display_name[:100], 
+            "displayName": final_display_name[:100], 
             "baseUnitOfMeasureCode": UNIT_CODE,
             "blocked": False
         }
@@ -347,7 +374,7 @@ class BusinessCentralConnector:
         base_api_root = self.base_url.rsplit("/v2.0", 1)[0] 
         custom_url = f"{base_api_root}/{API_PUBLISHER}/{API_GROUP}/{API_VERSION}/companies({self.company_id})/items"
 
-        print(f"🚀 Sende Request an BC: {display_name}")
+        print(f"🚀 Sende Request an BC: {payload['displayName']}")
         r = requests.post(custom_url, headers=headers, json=payload)
         
         if r.status_code == 201:
@@ -356,16 +383,14 @@ class BusinessCentralConnector:
             self.existing_items_cache.append(item) 
             print(f"   ✅ Erstellt: {item['number']} - {item['displayName']}")
             
-            # --- BILD LOGIK UPDATE (MIT CLEANING) ---
+            # --- BILD LOGIK (MIT CLEANING & CLOUD FALLBACK) ---
             final_img_path = bild_pfad
             temp_path = "temp_upload.jpg"
             
-            # Fallback auf URL, wenn lokal kein Bild da ist (typischer Cloud Fall)
             if (not final_img_path or not os.path.exists(final_img_path)) and 'Bild Datei URL' in scraped_data:
                 try:
                     img_url = scraped_data['Bild Datei URL']
                     if img_url:
-                        # Download
                         r_img = requests.get(img_url if img_url.startswith("http") else f"https://flowzz.com{img_url}", stream=True)
                         if r_img.status_code == 200:
                             with open(temp_path, 'wb') as f:
@@ -374,14 +399,13 @@ class BusinessCentralConnector:
                 except: pass
 
             if final_img_path and os.path.exists(final_img_path):
-                # 🧼 HIER WIRD GEPUTZT!
+                # Bild putzen
                 remove_watermark_rectangle(final_img_path)
 
                 if item_id:
                     time.sleep(1) 
                     self._upload_image(item_id, final_img_path)
             
-            # Cleanup
             if final_img_path == temp_path and os.path.exists(temp_path):
                 try: os.remove(temp_path)
                 except: pass
